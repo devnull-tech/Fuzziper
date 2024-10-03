@@ -1,4 +1,5 @@
 #/usr/bin/python3
+#Set-ExecutionPolicy Unrestricted -Scope Process
 
 import argparse
 from fuzzer import Fuzzer
@@ -10,6 +11,8 @@ def main():
     parser.add_argument('--url', '-u', type=str, help='Target Base URL for FUZZ action')
     parser.add_argument('--input', '-i', type=str, help='Input file (previus Fuzziper output) for READ action')
     parser.add_argument('--filter_code', '-fc', default="404",type=str, help='Filter by status code (404,500) for READ action (404 by default)')
+    parser.add_argument('--min-len', default=0,type=int, help='Minimum length for READ action (0 by default)')
+    parser.add_argument('--max-len', type=int, help='Maximum length for READ action')
     parser.add_argument('--method', '-m', default="GET", type=str, help='Fuzzing method (GET by default)')
     parser.add_argument('--wordlist', '-w', type=str, help='Wordlist PATH')
     parser.add_argument('--threads', '-t', default=10, type=int, help='Threads (10 by default)')
@@ -32,7 +35,14 @@ def main():
         reader.input_from_file(args.input)
         filter_status = args.filter_code.split(',')
         filter_status_list = [int(code) for code in filter_status]
-        print(Fuzzer.get_printable(reader.filter_status(filter_status_list)))
+
+        status_filtered_list = reader.filter_status(filter_status_list)
+        len_filtered_list = reader.filter_len(args.min_len, args.max_len)
+        intersection = [item for item in status_filtered_list if item in len_filtered_list]
+        if len(intersection) >= 1:
+            print(Fuzzer.get_printable(intersection))
+        else:
+            print("There are no results")
 
 if __name__ == '__main__':
     main()

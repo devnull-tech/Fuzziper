@@ -11,7 +11,7 @@ class Fuzzer:
             self.threads = threads
             self.wordlist_fragments = self._fragment_wordlist()
             self.thread_list = []
-        self.output = [] # {'url': 'http://ss.com/s', 'status_code': 200}
+        self.output = [] # {'url': 'http://ss.com/s', 'status_code': 200, 'response_len': 1956}
     
     def _fragment_wordlist(self) -> list:
         fragment_len = len(self.wordlist) // self.threads
@@ -23,6 +23,19 @@ class Fuzzer:
                end = (i + 1) * fragment_len
             wordlist_fragments.append(self.wordlist[ini:end])
         return wordlist_fragments
+
+    def filter_len(self, min: int, max: int) -> list:
+        if self.output == []:
+            return []
+        filter_len = []
+        for i in self.output:
+            if i['response_len'] >= min:
+                if max:
+                    if i['response_len'] <= max:
+                        filter_len.append(i)
+                else:
+                    filter_len.append(i)
+        return filter_len
 
     def filter_status(self, filter: list = [404]) -> list:
         if self.output == []:
@@ -56,7 +69,8 @@ class Fuzzer:
                     response = requests.get(url)
                 self.output.append({
                     'url': url,
-                    'status_code': response.status_code
+                    'status_code': response.status_code,
+                    'response_len': len(response.content)
                 })
             except Exception:
                 pass
@@ -83,5 +97,5 @@ class Fuzzer:
         base_url = responses[0]['url'][:index + 1]
         returnable = "Fuzziper output for " + base_url
         for i in responses:
-            returnable += "\n" + "/" + i['url'].split("/")[-1] + " -> ["+str(i['status_code'])+"]"
+            returnable += "\n" + "/" + i['url'].split("/")[-1] + " -> ["+str(i['status_code'])+"] --- length: " + str(i['response_len'])
         return returnable

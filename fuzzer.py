@@ -72,8 +72,9 @@ class Fuzzer:
                     'status_code': response.status_code,
                     'response_len': len(response.content)
                 })
-            except Exception:
-                pass
+            except Exception as e:
+                with open('errors.log', 'a') as file:
+                    file.write(f"{e}\n")
 
     def export_output(self, name: str = "output.txt") -> None:
         with open(name, 'w') as archivo_json:

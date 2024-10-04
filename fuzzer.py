@@ -3,7 +3,7 @@ import threading
 import requests
 
 class Fuzzer:
-    def __init__(self, wordlist_path: str, threads: int = 10, read_mode: bool = False) -> None:
+    def __init__(self, wordlist_path: str, threads: int = 10, read_mode: bool = False, max_errors: int = 50) -> None:
         self.read_mode = read_mode
         if not self.read_mode:
             with open(wordlist_path, 'r') as file:
@@ -11,8 +11,23 @@ class Fuzzer:
             self.threads = threads
             self.wordlist_fragments = self._fragment_wordlist()
             self.thread_list = []
+        self.error_count = 0
+        self.max_errors = max_errors
+        self.stoping = False
         self.output = [] # {'url': 'http://ss.com/s', 'status_code': 200, 'response_len': 1956}
     
+    def resume_fuzzing(self, incomplete_output_path: str) -> None:
+        self.input_from_file(incomplete_output_path)
+        print("[+] Discarding already proven options")
+        for i in self.output:
+            word = i['url'].split('/')[-1] + "\n"
+            self.wordlist.remove(word)
+        self.wordlist_fragments = self._fragment_wordlist()
+        print("[+] Resuming Fuzzing")
+        index = self.output[0]['url'].rfind('/')
+        base_url = self.output[0]['url'][:index + 1]
+        self.deploy_fuzz(base_url, 'HEAD' if self.output[0]['response_len'] == 0 else 'GET')
+
     def _fragment_wordlist(self) -> list:
         fragment_len = len(self.wordlist) // self.threads
         wordlist_fragments = []
@@ -47,7 +62,6 @@ class Fuzzer:
         return filtered_list
 
     def deploy_fuzz(self, url: str, method: str = 'GET') -> None:
-        self.output = []
         for wordlist_fragment in self.wordlist_fragments:
             thread = threading.Thread(target=self.requests_thread, args=(wordlist_fragment, url, method))
             self.thread_list.append(thread)
@@ -57,6 +71,8 @@ class Fuzzer:
 
     def requests_thread(self, wordlist_segment: list, base_url: str, method: str = 'GET') -> None:
         for word in wordlist_segment:
+            if self.stoping:
+                break
             url = base_url
             if url[len(url)-1] != "/":
                 url += "/"
@@ -73,8 +89,14 @@ class Fuzzer:
                     'response_len': len(response.content)
                 })
             except Exception as e:
+                self.error_count += 1
                 with open('errors.log', 'a') as file:
                     file.write(f"{e}\n")
+                if self.error_count >= self.max_errors and not self.stoping:
+                    self.stoping = True
+                    print("[!] Maximum number of allowed errors reached. Aborting ...")
+                    self.export_output("fuzziper_incomplete.txt")
+
 
     def export_output(self, name: str = "output.txt") -> None:
         with open(name, 'w') as archivo_json:

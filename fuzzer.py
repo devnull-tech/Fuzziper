@@ -1,6 +1,8 @@
 import json
 import threading
 import requests
+from colorama import Fore
+from datetime import datetime
 
 class Fuzzer:
     def __init__(self, wordlist_path: str, threads: int = 10, read_mode: bool = False, max_errors: int = 50) -> None:
@@ -18,12 +20,12 @@ class Fuzzer:
     
     def resume_fuzzing(self, incomplete_output_path: str) -> None:
         self.input_from_file(incomplete_output_path)
-        print("[+] Discarding already proven options")
+        print(Fore.CYAN + "[*] Discarding already proven options")
         for i in self.output:
             word = i['url'].split('/')[-1] + "\n"
             self.wordlist.remove(word)
         self.wordlist_fragments = self._fragment_wordlist()
-        print("[+] Resuming Fuzzing")
+        print(Fore.CYAN + "[*] Resuming Fuzzing")
         index = self.output[0]['url'].rfind('/')
         base_url = self.output[0]['url'][:index + 1]
         self.deploy_fuzz(base_url, 'HEAD' if self.output[0]['response_len'] == 0 else 'GET')
@@ -61,15 +63,16 @@ class Fuzzer:
                 filtered_list.append(i)
         return filtered_list
 
-    def deploy_fuzz(self, url: str, method: str = 'GET') -> None:
+    def deploy_fuzz(self, url: str, method: str = 'GET', verbose: bool = False, filter_status_list: list = [404]) -> None:
         for wordlist_fragment in self.wordlist_fragments:
-            thread = threading.Thread(target=self.requests_thread, args=(wordlist_fragment, url, method))
+            thread = threading.Thread(target=self.requests_thread, args=(wordlist_fragment, url, method, verbose, filter_status_list))
             self.thread_list.append(thread)
             thread.start()
         for thread in self.thread_list:
             thread.join()
 
-    def requests_thread(self, wordlist_segment: list, base_url: str, method: str = 'GET') -> None:
+    def requests_thread(self, wordlist_segment: list, base_url: str, method: str = 'GET', verbose: bool = False, 
+                        filter_status_list: list = [404]) -> None:
         for word in wordlist_segment:
             if self.stoping:
                 break
@@ -88,15 +91,17 @@ class Fuzzer:
                     'status_code': response.status_code,
                     'response_len': len(response.content)
                 })
+                if verbose:
+                    if not response.status_code in filter_status_list:
+                        print(Fore.GREEN + "[+] " + url + " -> " + "("+str(response.status_code)+") length: " + str(len(response.content)))
             except Exception as e:
                 self.error_count += 1
                 with open('errors.log', 'a') as file:
-                    file.write(f"{e}\n")
+                    file.write(str(datetime.now())+ " - " + f"{e}\n")
                 if self.error_count >= self.max_errors and not self.stoping:
                     self.stoping = True
-                    print("[!] Maximum number of allowed errors reached. Aborting ...")
-                    self.export_output("fuzziper_incomplete.txt")
-
+                    print(Fore.RED + "[!] Maximum number of allowed errors reached. Aborting ...")
+                    print(Fore.YELLOW + "[?] You can continue the fuzzing using the RESUME action and input the partial result.")
 
     def export_output(self, name: str = "output.txt") -> None:
         with open(name, 'w') as archivo_json:
@@ -108,11 +113,11 @@ class Fuzzer:
                 data = json.load(file)
             self.output = data
         except FileNotFoundError:
-            print(f"The {path} file was not found.")
+            print(Fore.RED + f"[!] The {path} file was not found.")
         except json.JSONDecodeError:
-            print(f"Error decoding {path} file.")
+            print(Fore.RED + f"[!] Error decoding {path} file.")
         except Exception as e:
-            print(f"An error occurred: {e}")
+            print(Fore.RED + f"[!] An error occurred: {e}")
     
     @staticmethod
     def get_printable(responses: list) -> str:
@@ -120,5 +125,5 @@ class Fuzzer:
         base_url = responses[0]['url'][:index + 1]
         returnable = "Fuzziper output for " + base_url
         for i in responses:
-            returnable += "\n" + "/" + i['url'].split("/")[-1] + " -> ["+str(i['status_code'])+"] --- length: " + str(i['response_len'])
+            returnable += "\n" + "/" + i['url'].split("/")[-1] + " -> ["+str(i['status_code'])+"] length: " + str(i['response_len'])
         return returnable

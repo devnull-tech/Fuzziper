@@ -1,20 +1,12 @@
 # !/usr/bin/python3
 # Set-ExecutionPolicy Unrestricted -Scope Process
 
-import signal
 import argparse
 from fuzzer import Fuzzer
 from datetime import datetime
+from colorama import init, Fore
 
-fuzzer: Fuzzer = None
-reader: Fuzzer = None
-
-def signal_handler(signum, frame):
-    if fuzzer is not None:
-        print("Stoping the threads")
-        fuzzer.stop_threads()
-
-signal.signal(signal.SIGINT, signal_handler)
+init(autoreset=True)
 
 def main():
     parser = argparse.ArgumentParser(description='Fuzziper V1.0 By Leandro Puentes Rivas (lpuentesrivas@gmail.com)')
@@ -27,40 +19,44 @@ def main():
     parser.add_argument('--max-errors', default=50, type=int, help='Errors allowed before abortion (50 by default)')
     parser.add_argument('--method', '-m', default="GET", type=str, help='Fuzzing method (GET by default)')
     parser.add_argument('--wordlist', '-w', type=str, help='Wordlist PATH')
+    parser.add_argument('--verbose', '-v', action='store_true', help='Verbose Mode')
     parser.add_argument('--threads', '-t', default=10, type=int, help='Threads (10 by default)')
     parser.add_argument('--output', '-o', default="fuzziper.txt", type=str, help='Output name (fuzziper.txt by default)')
     args = parser.parse_args()
 
     if args.action.lower() == "fuzz" and not (args.url and args.wordlist):
-        parser.error("The --wordlist and --url arguments are required when the action is 'FUZZ'.")
+        parser.error(Fore.RED + "[!] The --wordlist and --url arguments are required when the action is 'FUZZ'.")
     if args.action.lower() == "read" and not args.input:
-        parser.error("The --input argument are required when the action is 'READ'.")
+        parser.error(Fore.RED + "[!] The --input argument are required when the action is 'READ'.")
     if args.action.lower() == "resume" and not args.input:
-        parser.error("The --input argument are required when the action is 'RESUME'.")
+        parser.error(Fore.RED + "[!] The --input argument are required when the action is 'RESUME'.")
 
+    filter_status = args.filter_code.split(',')
+    filter_status_list = [int(code) for code in filter_status]
     if args.action.lower() == "fuzz":
-        print("[+] Fuzziper starting at - " + str(datetime.now()))
+        print(Fore.CYAN + "[*] Fuzziper starting at - " + str(datetime.now()))
         fuzzer = Fuzzer(args.wordlist, args.threads, max_errors=args.max_errors)
-        fuzzer.deploy_fuzz(args.url, args.method)
-        fuzzer.export_output(args.output)
-        print("[+] Fuzziper end at - " + str(datetime.now()))
+        fuzzer.deploy_fuzz(args.url, args.method, args.verbose)
+        if len(fuzzer.output) > 0:
+            fuzzer.export_output(args.output)
+        else:
+            print(Fore.YELLOW + "[?] There are no output, then the file will not be created.")
+        print(Fore.CYAN + "[*] Fuzziper end at - " + str(datetime.now()))
     if args.action.lower() == "read":
         reader = Fuzzer("", read_mode=True)
         reader.input_from_file(args.input)
-        filter_status = args.filter_code.split(',')
-        filter_status_list = [int(code) for code in filter_status]
         status_filtered_list = reader.filter_status(filter_status_list)
         len_filtered_list = reader.filter_len(args.min_len, args.max_len)
         intersection = [item for item in status_filtered_list if item in len_filtered_list]
         if len(intersection) >= 1:
             print(Fuzzer.get_printable(intersection))
         else:
-            print("There are no results")
+            print(Fore.CYAN + "[*] There are no results")
     if args.action.lower() == "resume":
-        print("[+] Fuzziper resuming at - " + str(datetime.now()))
+        print(Fore.CYAN + "[*] Fuzziper resuming at - " + str(datetime.now()))
         fuzzer = Fuzzer(args.wordlist, args.threads, max_errors=args.max_errors)
         fuzzer.resume_fuzzing(args.input)
-        print("[+] Fuzziper end at - " + str(datetime.now()))
+        print(Fore.CYAN + "[*] Fuzziper end at - " + str(datetime.now()))
 
 if __name__ == '__main__':
     main()

@@ -9,11 +9,11 @@ from colorama import init, Fore
 init(autoreset=True)
 
 def main():
-    parser = argparse.ArgumentParser(description='Fuzziper V1.0 By Leandro Puentes Rivas (lpuentesrivas@gmail.com)')
+    parser = argparse.ArgumentParser(description=Fore.YELLOW + 'Fuzziper V1.0 By Leandro Puentes Rivas (lpuentesrivas@gmail.com)' + Fore.WHITE)
     parser.add_argument('action', type=str, help='Action (FUZZ, READ, RESUME)')
     parser.add_argument('--url', '-u', type=str, help='Target Base URL for FUZZ action')
     parser.add_argument('--input', '-i', type=str, help='Input file (previus Fuzziper output) for READ and RESUME actions')
-    parser.add_argument('--filter_code', '-fc', default="404",type=str, help='Filter by status code (404,500) for READ action (404 by default)')
+    parser.add_argument('--filter_code', '-fc', default="404",type=str, help='Filter by status code (404,500) for READ action and verbose (-v) mode (404 by default)')
     parser.add_argument('--min-len', default=0,type=int, help='Minimum length for READ action (0 by default)')
     parser.add_argument('--max-len', type=int, help='Maximum length for READ action')
     parser.add_argument('--max-errors', default=50, type=int, help='Errors allowed before abortion (50 by default)')
